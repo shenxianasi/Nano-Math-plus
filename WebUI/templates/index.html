@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Math</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)'], ['$', '$']],
+                displayMath: [['\\[', '\\]'], ['$$', '$$']],
+                processEscapes: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary-color: #4d6bfe;
+            --bg-color: #ffffff;
+            --text-color: #1f2329;
+            --input-bg: #f4f5f7;
+            --border-radius: 12px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            transition: all 0.3s ease;
+        }
+
+        .logo-container {
+            margin-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-top: 20px;
+            color: #1f2329;
+        }
+
+        .chat-history {
+            width: 100%;
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            display: none; /* Hidden initially */
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 24px;
+            line-height: 1.6;
+            display: flex;
+            gap: 16px;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            background-color: #f4f5f7;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-height: 60vh;
+            overflow-y: auto;
+            overflow-x: auto;
+            display: block;
+        }
+
+        .message.user .message-content {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .input-area {
+            width: 100%;
+            max-width: 768px;
+            background: var(--input-bg);
+            border-radius: 24px;
+            padding: 12px 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .input-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            resize: none;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.5;
+            color: var(--text-color);
+            min-height: 24px;
+            max-height: 200px;
+            padding: 8px 0;
+            font-family: inherit;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .features {
+            display: flex;
+            gap: 10px;
+        }
+
+        .feature-btn {
+            background: #e3e5e8;
+            border: none;
+            border-radius: 16px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #646a73;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .feature-btn:hover {
+            background: #d1d4d9;
+        }
+        
+        .feature-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+            color: #646a73;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(0,0,0,0.05);
+        }
+
+        .send-btn {
+            background: var(--primary-color);
+            color: white;
+            width: 32px;
+            height: 32px;
+        }
+        
+        .send-btn:hover {
+            background: #3d5afe;
+        }
+
+        .send-btn:disabled {
+            background: #e3e5e8;
+            cursor: not-allowed;
+        }
+
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            width: fit-content;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .file-preview img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .file-preview .remove {
+            cursor: pointer;
+            color: #999;
+            font-size: 14px;
+            padding: 0 8px;
+            font-weight: bold;
+        }
+
+        .file-preview .remove:hover {
+            color: #ff4444;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Markdown style for output */
+        pre {
+            background: #f4f5f7;
+            padding: 10px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+
+        /* SVG Icon styling */
+        .logo-svg {
+            width: 60px;
+            height: 60px;
+        }
+        
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="mainContainer">
+        <!-- Logo Area -->
+        <div class="logo-container" id="logoArea">
+            <svg class="logo-svg" id="mainLogo" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="g" cx="50%" cy="50%">
+                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1"/>
+                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.3"/>
+                  </radialGradient>
+                </defs>
+            </svg>
+            <script>
+                (function() {
+                    const svg = document.getElementById('mainLogo');
+                    const r = 120;
+                    let path = '';
+                    for(let i = 0; i < 24; i += 2) {
+                      let a1 = i * Math.PI / 12;
+                      let a2 = (i + 1) * Math.PI / 12;
+                      let x2 = 200 + Math.cos(a2) * r;
+                      let y2 = 200 + Math.sin(a2) * r;
+                      let x3 = 200 + Math.cos(a2) * (r - 90);
+                      let y3 = 200 + Math.sin(a2) * (r - 90);
+                      path += `M${x2},${y2} L${x3},${y3} `;
+                    }
+                    // Create path elements dynamically
+                    const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path1.setAttribute("d", path);
+                    path1.setAttribute("stroke", "url(#g)");
+                    path1.setAttribute("stroke-width", "6");
+                    path1.setAttribute("stroke-linecap", "round");
+                    path1.setAttribute("fill", "none");
+                    svg.appendChild(path1);
+
+                    const path2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path2.setAttribute("d", "M200,-12 L212,0 L200,12 L188,0 Z");
+                    path2.setAttribute("transform", "translate(0,200)");
+                    path2.setAttribute("fill", "#000");
+                    svg.appendChild(path2);
+                })();
+            </script>
+            <div class="title">今天有什么可以帮到你？</div>
+        </div>
+
+        <!-- Chat History -->
+        <div class="chat-history" id="chatHistory">
+            <!-- Messages will appear here -->
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div id="filePreviewContainer"></div>
+            <div class="input-container">
+                <textarea id="promptInput" placeholder="给 Math Solver 发送消息" rows="1"></textarea>
+                <div class="controls">
+                    <div class="features">
+                        <button class="feature-btn" id="deepThinkBtn">深度思考</button>
+                        <button class="feature-btn" id="webSearchBtn">联网搜索</button>
+                    </div>
+                    <div class="actions">
+                        <input type="file" id="fileInput" accept="image/*, .pdf, .txt" style="display: none;">
+                        <button class="icon-btn" onclick="document.getElementById('fileInput').click()" title="上传图片">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                            </svg>
+                        </button>
+                        <button class="icon-btn send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="19" x2="12" y2="5"></line>
+                                <polyline points="5 12 12 5 19 12"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const filePreviewContainer = document.getElementById('filePreviewContainer');
+        const sendBtn = document.getElementById('sendBtn');
+        const promptInput = document.getElementById('promptInput');
+        const chatHistory = document.getElementById('chatHistory');
+        const logoArea = document.getElementById('logoArea');
+        const mainContainer = document.getElementById('mainContainer');
+        const deepThinkBtn = document.getElementById('deepThinkBtn');
+        const webSearchBtn = document.getElementById('webSearchBtn');
+        
+        let currentFile = null;
+        let deepThinkingEnabled = false;
+        let webSearchEnabled = false;
+
+        deepThinkBtn.addEventListener('click', function() {
+            deepThinkingEnabled = !deepThinkingEnabled;
+            deepThinkBtn.classList.toggle('active', deepThinkingEnabled);
+        });
+        webSearchBtn.addEventListener('click', function() {
+            webSearchEnabled = !webSearchEnabled;
+            webSearchBtn.classList.toggle('active', webSearchEnabled);
+        });
+
+        // Auto-resize textarea
+        promptInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            checkInput();
+        });
+
+        // Enter key to send (Shift+Enter for newline)
+        promptInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendBtn.disabled) {
+                    sendMessage();
+                }
+            }
+        });
+
+        // 绑定粘贴事件到整个文档，而不仅仅是 textarea
+        document.addEventListener('paste', handlePaste);
+
+        function handlePaste(e) {
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+            
+            // 检查是否有文件
+            let file = null;
+            
+            // 1. 检查 items (现代浏览器)
+            if (clipboardData.items) {
+                for (let i = 0; i < clipboardData.items.length; i++) {
+                    const item = clipboardData.items[i];
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        file = item.getAsFile();
+                        break;
+                    }
+                }
+            }
+            
+            // 2. 检查 files (传统方式)
+            if (!file && clipboardData.files && clipboardData.files.length > 0) {
+                for (let i = 0; i < clipboardData.files.length; i++) {
+                    const potentialFile = clipboardData.files[i];
+                    if (potentialFile.type.startsWith('image/')) {
+                        file = potentialFile;
+                        break;
+                    }
+                }
+            }
+            
+            if (file) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 处理文件名
+                let fileName = file.name;
+                if (!fileName || fileName === 'image.png' || fileName === 'image.jpeg' || fileName === 'image.jpg') {
+                    const ext = file.type.split('/')[1] || 'png';
+                    const timestamp = Date.now();
+                    fileName = `粘贴图片_${timestamp}.${ext}`;
+                }
+                
+                // 重新创建 File 对象
+                const renamedFile = new File([file], fileName, { type: file.type });
+                handleFile(renamedFile);
+                
+                // 显示提示
+                showToast('图片已粘贴');
+            }
+        }
+
+        // 拖放处理
+        const inputArea = document.querySelector('.input-area');
+        
+        inputArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = 'var(--primary-color)';
+            this.style.background = '#e8ebff';
+        });
+
+        inputArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = 'transparent';
+            this.style.background = 'var(--input-bg)';
+        });
+
+        inputArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = 'transparent';
+            this.style.background = 'var(--input-bg)';
+            
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                if (file.type.startsWith('image/')) {
+                    handleFile(file);
+                    showToast('图片已上传');
+                } else {
+                    showToast('请上传图片文件', true);
+                }
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('请选择图片文件', true);
+                return;
+            }
+            
+            currentFile = file;
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                filePreviewContainer.innerHTML = `
+                    <div class="file-preview">
+                        <img src="${e.target.result}" alt="预览">
+                        <span style="font-size: 12px; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${currentFile.name}</span>
+                        <span class="remove" onclick="removeFile()" title="移除文件">×</span>
+                    </div>
+                `;
+                checkInput();
+            };
+            
+            reader.onerror = function() {
+                showToast('文件读取失败', true);
+                removeFile();
+            };
+            
+            reader.readAsDataURL(currentFile);
+        }
+
+        fileInput.addEventListener('change', function(e) {
+            if (this.files && this.files[0]) {
+                handleFile(this.files[0]);
+            }
+        });
+
+        function removeFile() {
+            currentFile = null;
+            fileInput.value = '';
+            filePreviewContainer.innerHTML = '';
+            checkInput();
+        }
+
+        function checkInput() {
+            const hasContent = promptInput.value.trim().length > 0;
+            const hasFile = currentFile !== null;
+            
+            sendBtn.disabled = !(hasContent || hasFile);
+            
+            if (hasFile) {
+                sendBtn.title = '发送消息和图片';
+            } else {
+                sendBtn.title = '发送消息';
+            }
+        }
+
+        function showToast(message, isError = false) {
+            // 移除旧的 toast
+            const oldToast = document.querySelector('.toast');
+            if (oldToast) oldToast.remove();
+            
+            // 创建新的 toast
+            const toast = document.createElement('div');
+            toast.className = `toast ${isError ? 'error' : ''}`;
+            toast.textContent = message;
+            toast.style.background = isError ? '#ff4444' : 'var(--primary-color)';
+            document.body.appendChild(toast);
+            
+            // 显示 toast
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // 3秒后隐藏并移除
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        async function sendMessage() {
+            if (!currentFile && !promptInput.value.trim()) return;
+
+            const promptText = promptInput.value;
+            const fileToSend = currentFile;
+
+            // UI 过渡
+            logoArea.style.display = 'none';
+            chatHistory.style.display = 'block';
+            mainContainer.style.justifyContent = 'flex-start';
+            mainContainer.style.paddingTop = '40px';
+
+            // 添加用户消息
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'message user';
+            let contentHtml = `<div class="message-content">`;
+            if (fileToSend) {
+                // 在消息中显示缩略图
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    contentHtml += `
+                        <div style="margin-bottom:8px; font-weight:500;">[图片上传]</div>
+                        <div style="font-size:12px; opacity:0.8; margin-bottom:8px;">${fileToSend.name}</div>
+                        <img src="${e.target.result}" style="max-width:200px; border-radius:8px; margin-bottom:8px;" alt="上传的图片">
+                    `;
+                };
+                // 由于 FileReader 是异步的，我们先发送消息，稍后更新
+            }
+            contentHtml += `${promptText || '[图片识别]'}</div>`;
+            userMsgDiv.innerHTML = contentHtml;
+            chatHistory.appendChild(userMsgDiv);
+            
+            // 如果文件存在，异步读取并更新消息
+            if (fileToSend) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imgPreview = userMsgDiv.querySelector('img') || (() => {
+                        const img = document.createElement('img');
+                        img.style.maxWidth = '200px';
+                        img.style.borderRadius = '8px';
+                        img.style.marginBottom = '8px';
+                        userMsgDiv.querySelector('.message-content').insertBefore(img, userMsgDiv.querySelector('.message-content').firstChild);
+                        const nameDiv = document.createElement('div');
+                        nameDiv.style.fontSize = '12px';
+                        nameDiv.style.opacity = '0.8';
+                        nameDiv.style.marginBottom = '8px';
+                        nameDiv.textContent = fileToSend.name;
+                        userMsgDiv.querySelector('.message-content').insertBefore(nameDiv, img);
+                        const titleDiv = document.createElement('div');
+                        titleDiv.style.marginBottom = '8px';
+                        titleDiv.style.fontWeight = '500';
+                        titleDiv.textContent = '[图片上传]';
+                        userMsgDiv.querySelector('.message-content').insertBefore(titleDiv, nameDiv);
+                        return img;
+                    })();
+                    imgPreview.src = e.target.result;
+                };
+                reader.readAsDataURL(fileToSend);
+            }
+
+            // 清空输入
+            promptInput.value = ''; 
+            promptInput.style.height = 'auto';
+            removeFile();
+            checkInput();
+
+            // 添加加载消息
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message ai';
+            loadingDiv.innerHTML = `
+                <div class="message-content" style="background:white; border:1px solid #eee;">
+                    <span class="spinner" style="display:inline-block; margin-right:8px; vertical-align:middle;"></span>
+                    <span>正在分析数学问题...</span>
+                </div>
+            `;
+            chatHistory.appendChild(loadingDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            // 发送请求
+            const formData = new FormData();
+            if (fileToSend) {
+                formData.append('file', fileToSend);
+            }
+            if (promptText) {
+                formData.append('prompt', promptText);
+            }
+            formData.append('deep_think', deepThinkingEnabled ? '1' : '0');
+            formData.append('web_search', webSearchEnabled ? '1' : '0');
+
+            try {
+                const response = await fetch('/predict_stream', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok || !response.body) {
+                    const txt = await response.text();
+                    loadingDiv.innerHTML = `<div class="message-content" style="color:red">错误: ${txt || '网络错误'}</div>`;
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                    return;
+                }
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let fullText = '';
+                const contentEl = loadingDiv.querySelector('.message-content');
+                contentEl.innerHTML = ''; // 清空 spinner 内容
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, {stream: true});
+                    fullText += chunk;
+                    contentEl.textContent = fullText;
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                }
+                if (window.MathJax) {
+                    window.MathJax.typesetPromise([loadingDiv]).catch((err) => console.log(err));
+                }
+            } catch (err) {
+                loadingDiv.innerHTML = `<div class="message-content" style="color:red">请求失败: ${err.message}</div>`;
+            }
+            
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+    </script>
+</body>
+</html>

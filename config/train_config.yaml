@@ -1,0 +1,365 @@
+# CI 格式检查强制要求：
+# 1. 注释必须出现在每个字段上方。
+# 2. 每个字段之间必须有一个空行。
+# 3. 不允许行内注释（即同一行字段后的注释）。
+# 4. 嵌套字段必须遵守缩进级别。
+
+# 指定默认的组件配置
+defaults:
+
+  # <文件夹名>@<字段名>.<字段名>: <yaml文件名>
+  # actor_rollout_ref.actor: trainer/config/actor/dp_actor.yaml
+  - actor@actor_rollout_ref.actor: dp_actor
+
+  # data: trainer/config/data/legacy_data.yaml
+  - data@data: legacy_data
+
+  # (基于规则的) 奖励管理器配置。
+  - reward_manager@reward_manager
+
+  # 参考模型配置。
+  # 当 actor.use_kl_loss 或 algorithm.use_kl_in_reward 为 True 时，参考模型将被启用。
+  - ref@actor_rollout_ref.ref: dp_ref
+
+  # Rollout 模型配置。
+  - rollout@actor_rollout_ref.rollout: rollout
+
+  # 模型配置。
+  - model@actor_rollout_ref.model: hf_model
+
+  # Critic 模型配置。
+  - critic@critic: dp_critic
+
+  # 奖励模型配置。
+  - reward_model@reward_model: reward_model
+
+  # Rollout 修正配置。
+  - algorithm@algorithm.rollout_correction: rollout_correction
+
+  # 加载默认参考配置，然后应用当前 yaml 中的字段
+  # self 配置覆盖上面的任何配置
+  - _self_
+
+# actor、rollout 和 reference 模型的配置
+actor_rollout_ref:
+
+  # 是否是混合引擎，目前仅支持混合引擎
+  hybrid_engine: true
+
+  # 针对进程组执行操作的超时时间
+  nccl_timeout: 600
+
+  # 模型配置
+  model:
+    # 模型路径，这里使用的是 Qwen2.5-VL-3B-Instruct 经过 SFT 微调后的模型
+    # 请确保此路径在您的机器上是正确的，如果是 HF ID 则保持原样
+    path: pretrained_model
+
+    # 是否启用梯度检查点
+    enable_gradient_checkpointing: True
+
+    # 是否使用移除 padding
+    use_remove_padding: True
+
+    # Flash Attention 2 设置 (通常通过 attn_implementation 或 kwargs 传递)
+    flash_attn: fa2
+
+    # LoRA 配置
+    # 设置为正整数以启用 LoRA (例如 16)
+    lora_rank: 16
+    lora_alpha: 32
+    # 目标模块
+    target_modules: all-linear
+    # lora_target: all # 映射到 target_modules: all-linear
+
+  # Rollout 模型配置。
+  rollout:
+    # 指定使用 vllm
+    name: vllm
+
+    # 对于超大模型，分层召唤可以节省内存（防止 OOM）但会变慢
+    layered_summon: False
+
+    # GPU 数量
+    n_gpus: 2
+
+    # vLLM 的 Tensor Parallel 大小
+    # 对于 3B 模型，建议设为 1，这样 2 张卡就是 2 个独立的 worker，生成速度更快
+    # 如果设为 2，则是一个模型横跨 2 张卡，通信开销大且并发低
+    tensor_model_parallel_size: 1
+
+    # vLLM 显存利用率
+    gpu_memory_utilization: 0.5
+
+    # GRPO 采样数量 (每条 prompt 生成 n 个 response)
+    n: 4
+
+  # Actor 模型配置
+  actor:
+    # GPU 数量
+    n_gpus: 2
+
+    # 分布式策略，fsdp 是 PyTorch 的标准
+    strategy: fsdp
+
+    train_batch_size: 16
+
+    # PPO Mini Batch Size
+    ppo_mini_batch_size: 4
+
+    # PPO Micro Batch Size per GPU
+    ppo_micro_batch_size_per_gpu: 1
+
+    # 冻结视觉塔
+    freeze_vision_tower: true
+
+    # 冻结多模态投影器 (如果支持该配置)
+    freeze_multi_modal_projector: true
+
+    # 是否使用 KL 损失而不是 KL 奖励惩罚。GRPO 推荐为 True
+    use_kl_loss: True
+
+    # FSDP 配置 (混合精度训练)
+    fsdp_config:
+      param_offload: False
+      optimizer_offload: False
+      # 模型加载精度 (qwen2.5-VL-3B-Instruct 模型精度为 bfloat16)
+      model_dtype: bfloat16
+      # 混合精度类型
+      dtype: bfloat16
+
+  # Reference 模型配置
+  ref:
+    # GPU 数量
+    n_gpus: 2
+    # 分布式策略
+    strategy: fsdp
+
+# 数据配置
+data:
+  # 训练文件路径 (使用正斜杠以兼容)
+  train_files: dataset-verl/train/data.parquet
+  # 验证文件路径
+  val_files: dataset-verl/valid/data.parquet
+  # prompt 字段键名
+  prompt_key: prompt
+  # response 字段键名
+  response_key: response
+
+  # 最大 Prompt 长度
+  max_prompt_length: 512
+  # 最大 Response 长度 (与 reward manager 中的 max_tokens 保持一致)
+  max_response_length: 2048
+
+  train_batch_size: 16
+
+  gen_batch_size: 2
+
+# 自定义奖励函数定义
+custom_reward_function:
+
+  # 包含自定义奖励函数的文件路径。
+  # 建议使用绝对路径或确保相对路径正确
+  path: verl/verl/workers/reward_manager/my_reward_manager.py
+
+  # 指定文件中的奖励函数名称。默认为 'compute_score'。
+  name: my_reward_manager
+
+# 奖励管理器配置 override
+reward_manager:
+  # 指定使用自定义的 reward manager 类型
+  type: my_reward_manager
+
+# 算法配置
+algorithm:
+
+  # 当使用 verl.utils.omega_conf_to_dataclass 实例化数据类配置时需要
+  _target_: verl.trainer.config.AlgoConfig
+
+  # 未来奖励的折扣因子
+  gamma: 1.0
+
+  # GAE 估计器中偏差和方差之间的权衡
+  lam: 1.0
+
+  # 优势估计器类型："gae", "grpo", "reinforce_plus_plus" 等
+  adv_estimator: grpo
+
+  # 是否在 GRPO 中通过标准差归一化优势
+  # 推荐设为 True 以稳定训练
+  norm_adv_by_std_in_grpo: True
+
+  # 是否启用奖励内的 KL 惩罚
+  use_kl_in_reward: False
+
+  # 如何估计 KL 散度："kl", "abs", "mse", "low_var_kl", 或 "full"
+  kl_penalty: kl
+
+  # KL 控制配置
+  kl_ctrl:
+
+    # 当使用 verl.utils.omega_conf_to_dataclass 实例化数据类配置时需要
+    _target_: verl.trainer.config.KLControlConfig
+
+    # KL 控制类型："fixed" 或 "adaptive"
+    type: fixed
+
+    # KL 惩罚的初始系数
+    kl_coef: 0.001
+
+    # 自适应控制器的视界值（如果启用）
+    horizon: 10000
+
+    # 目标 KL 散度（用于自适应控制器）
+    target_kl: 0.1
+
+  # 是否启用偏好反馈 PPO
+  use_pf_ppo: False
+
+  # 偏好反馈 PPO 设置
+  pf_ppo:
+
+    # 重新加权样本的方法："pow", "max_min", 或 "max_random"
+    reweight_method: pow
+
+    # "pow" 方法中用于权重缩放的幂
+    weight_pow: 2.0
+
+# 训练器配置
+trainer:
+
+  # 是否在分布式 worker 之间平衡 batch 大小
+  balance_batch: True
+
+  # 训练的总 epoch 数
+  total_epochs: 3
+
+  # 总训练步数（可以显式设置或从 epochs 推导）
+  total_training_steps: null
+
+  # 实验跟踪的项目名称（例如 wandb）
+  project_name: math-pro-grpo
+
+  # 跟踪工具中的运行标识实验名称
+  experiment_name: qwen2.5-vl-sft-verl
+
+  # 使用的日志后端："console", "wandb" 等
+  logger: ["tensorboard"]
+
+  # 验证期间要记录的生成数量
+  log_val_generations: 10
+
+  # 记录 rollout 数据的目录；如果为 null 则不转储
+  rollout_data_dir: null
+
+  # 记录验证数据的目录；如果为 null 则不转储
+  validation_data_dir: null
+
+  # 训练中使用的节点数
+  nnodes: 1
+
+  # 每个节点的 GPU 数量
+  n_gpus_per_node: 1
+
+  # 模型检查点的保存频率（按迭代次数）
+  save_freq: 10
+
+  # ESI 指的是训练期间使用的弹性服务器实例，类似于训练计划。
+  esi_redundant_time: 0
+
+  # 恢复模式："auto", "disable", 或 "resume_path"
+  resume_mode: auto
+
+  # 恢复训练的路径（仅当 resume_mode 为 "resume_path" 时使用）
+  resume_from_path: null
+
+  # 是否在训练开始前运行验证
+  val_before_train: True
+
+  # 是否仅运行验证
+  val_only: False
+
+  # 验证频率（按训练迭代次数）
+  test_freq: 5
+
+  # 在更新策略之前预热 critic 的迭代次数
+  critic_warmup: 0
+
+  # 保存检查点的分布式文件系统默认路径
+  default_hdfs_dir: null
+
+  # 加载后是否删除本地检查点
+  del_local_ckpt_after_load: False
+
+  # 保存检查点的默认本地目录
+  default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}
+
+  # 保留的最大 actor 检查点数量
+  max_actor_ckpt_to_keep: 5
+
+  # 保留的最大 critic 检查点数量
+  max_critic_ckpt_to_keep: null
+
+  # Ray worker 等待注册中心的超时时间（秒）
+  ray_wait_register_center_timeout: 300
+
+  # 运行训练的设备（例如 "cuda", "cpu"）
+  device: cuda
+
+  # 是否使用旧版 worker 实现
+  use_legacy_worker_impl: auto
+
+# 分析器配置
+global_profiler:
+
+  # 当使用 verl.utils.omega_conf_to_dataclass 实例化数据类配置时需要
+  _target_: verl.utils.profiler.ProfilerConfig
+
+  # 分析工具：在 nsys, npu, torch, torch_memory 之间选择
+  tool: null
+
+  # 分析步数
+  steps: null
+
+  # 是否将连续步骤合并到一个数据库中。
+  profile_continuous_steps: False
+
+  # 保存分析内容的路径
+  save_path: "outputs/profile"
+
+  # 特定工具配置
+  global_tool_config:
+
+    # nsys 配置
+    nsys:
+      _target_: verl.utils.profiler.config.NsightToolConfig
+      discrete: False
+      controller_nsight_options:
+        trace: "cuda,nvtx,cublas,ucx"
+        cuda-memory-usage: "true"
+        cuda-graph-trace: "graph"
+      worker_nsight_options:
+        trace: "cuda,nvtx,cublas,ucx"
+        cuda-memory-usage: "true"
+        cuda-graph-trace: "graph"
+        capture-range: "cudaProfilerApi"
+        capture-range-end: null
+        kill: none
+
+    # 启用内存可视化以调试内存使用情况
+    torch_memory:
+      trace_alloc_max_entries: 100_000
+      stack_depth: 32
+      context: "all"
+      stacks: "all"
+      kw_args: {}
+
+# TransferQueue 配置
+transfer_queue:
+  enable: False
+
+# ray 相关配置
+ray_kwargs:
+  ray_init:
+    num_cpus: null
+  timeline_json_file: null
